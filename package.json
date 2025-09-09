@@ -1,31 +1,63 @@
 {
-  "name": "my-app-name",
+  "name": "cobalt-cms",
   "version": "0.1.0",
   "private": true,
   "description": "A Strapi application",
   "scripts": {
     "build": "strapi build",
+    "console": "strapi console",
     "deploy": "strapi deploy",
+    "dev": "strapi develop",
     "develop": "strapi develop",
     "seed:example": "node ./scripts/seed.js",
     "start": "strapi start",
-    "strapi": "strapi"
+    "strapi": "strapi",
+    "upgrade": "npx @strapi/upgrade latest",
+    "upgrade:dry": "npx @strapi/upgrade latest --dry",
+    "migrate:db": "node scripts/migrate-to-ec2.js",
+    "setup:ec2": "bash scripts/setup-ec2-database.sh",
+    "setup:ec2:ubuntu": "bash scripts/setup-ec2-database-ubuntu.sh",
+    "setup:sqlite:ec2": "bash scripts/setup-sqlite-ec2.sh",
+    "deploy:ec2": "bash scripts/deploy-to-ec2.sh",
+    "deploy:ec2:ubuntu": "bash scripts/deploy-to-ec2-ubuntu.sh",
+    "test:db": "node scripts/test-connection.js",
+    "check:sync": "node scripts/check-db-sync.js",
+    "check:sync:bash": "bash scripts/check-db-sync.sh",
+    "check:sync:sqlite": "bash scripts/check-db-sync-sqlite.sh",
+    "copy:sqlite": "bash scripts/copy-sqlite-to-ec2.sh",
+    "merge:sqlite": "bash scripts/merge-sqlite-to-ec2.sh",
+    "ec2:utils": "bash scripts/ec2-sqlite-utils.sh"
   },
   "dependencies": {
-    "@strapi/plugin-cloud": "5.15.0",
-    "@strapi/plugin-users-permissions": "5.15.0",
-    "@strapi/strapi": "5.15.0",
+    "@strapi/plugin-cloud": "5.20.0",
+    "@strapi/plugin-users-permissions": "5.20.0",
+    "@strapi/strapi": "5.20.0",
+    "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
     "better-sqlite3": "11.3.0",
     "fs-extra": "^10.0.0",
+    "lodash": "^4.17.21",
     "mime-types": "^2.1.27",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
+    "react-intl": "^6.8.9",
     "react-router-dom": "^6.0.0",
-    "styled-components": "^6.0.0"
+    "styled-components": "^6.0.0",
+    "yup": "^1.7.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@types/lodash": "^4.17.20",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  },
   "engines": {
     "node": ">=18.0.0 <=22.x.x",
     "npm": ">=6.0.0"
+  },
+  "strapi": {
+    "uuid": "bbbd32ca-2a2d-4bdf-ba61-a0251093a8c1",
+    "installId": "1a2764201dec454d17ffb713087191a040dbe611c0f6b5bc29304ac6a690b78f"
   }
 }

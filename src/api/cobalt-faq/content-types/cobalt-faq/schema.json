@@ -1,0 +1,27 @@
+{
+  "kind": "collectionType",
+  "collectionName": "cobalt_faqs",
+  "info": {
+    "singularName": "cobalt-faq",
+    "pluralName": "cobalt-faqs",
+    "displayName": "COBALT-FAQ"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "faqItems": {
+      "type": "string"
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "key": {
+      "type": "string"
+    },
+    "descriptionDetails": {
+      "type": "richtext"
+    }
+  }
+}

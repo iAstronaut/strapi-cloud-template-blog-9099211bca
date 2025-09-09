@@ -1,0 +1,583 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\geometry{margin=2.5cm}
+
+% Cấu hình màu cho code
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+% Cấu hình header
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Cobalt CMS - EC2 Setup Guide}
+\lhead{Technest}
+\rfoot{Trang \thepage}
+
+% Cấu hình tiêu đề
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+
+\title{\textbf{HƯỚNG DẪN SETUP EC2 CHO COBALT CMS}}
+\author{Technest Development Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Tổng quan}
+Tài liệu này mô tả chi tiết quy trình setup và deploy dự án Cobalt CMS lên Amazon EC2, bao gồm:
+\begin{itemize}
+    \item Tạo và cấu hình EC2 instance
+    \item Cài đặt các dịch vụ cần thiết (Nginx, PM2, Node.js)
+    \item Clone source code từ Git repository
+    \item Cấu hình database và media files
+    \item Build và deploy ứng dụng
+    \item Kiểm tra hoạt động
+\end{itemize}
+
+\section{Yêu cầu hệ thống}
+\begin{itemize}
+    \item \textbf{EC2 Instance}: Ubuntu 22.04 LTS (t2.medium trở lên)
+    \item \textbf{Storage}: Tối thiểu 20GB
+    \item \textbf{Node.js}: Phiên bản 18.x hoặc 22.x
+    \item \textbf{Database}: SQLite (built-in) hoặc PostgreSQL/MySQL
+    \item \textbf{Web Server}: Nginx
+    \item \textbf{Process Manager}: PM2
+\end{itemize}
+
+\section{Tạo EC2 Instance}
+
+\subsection{Bước 1: Tạo EC2 Instance}
+\begin{enumerate}
+    \item Đăng nhập vào AWS Console
+    \item Chọn EC2 Service
+    \item Click "Launch Instance"
+    \item Cấu hình như sau:
+    \begin{itemize}
+        \item \textbf{Name}: cobalt-cms-production
+        \item \textbf{AMI}: Ubuntu Server 22.04 LTS
+        \item \textbf{Instance Type}: t2.medium (2 vCPU, 4GB RAM)
+        \item \textbf{Key Pair}: Tạo mới hoặc chọn key pair có sẵn
+        \item \textbf{Security Group}: Tạo mới với các rule sau:
+        \begin{itemize}
+            \item SSH (Port 22): 0.0.0.0/0
+            \item HTTP (Port 80): 0.0.0.0/0
+            \item HTTPS (Port 443): 0.0.0.0/0
+            \item Custom TCP (Port 1337): 0.0.0.0/0 (Strapi)
+        \end{itemize}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Bước 2: Kết nối SSH}
+Sau khi instance khởi động, kết nối SSH:
+\begin{lstlisting}[language=bash]
+ssh -i your-key.pem ubuntu@your-ec2-public-ip
+\end{lstlisting}
+
+\section{Setup EC2 Instance}
+
+\subsection{Cập nhật hệ thống}
+\begin{lstlisting}[language=bash]
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl wget git unzip
+\end{lstlisting}
+
+\subsection{Cài đặt Node.js}
+\begin{lstlisting}[language=bash]
+# Cài đặt Node.js 18.x
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Kiểm tra phiên bản
+node --version
+npm --version
+
+# Cài đặt PM2 globally
+sudo npm install -g pm2
+\end{lstlisting}
+
+\subsection{Cài đặt Nginx}
+\begin{lstlisting}[language=bash]
+# Cài đặt Nginx
+sudo apt install -y nginx
+
+# Khởi động và enable Nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# Kiểm tra trạng thái
+sudo systemctl status nginx
+\end{lstlisting}
+
+\subsection{Cài đặt các dependencies khác}
+\begin{lstlisting}[language=bash]
+# Cài đặt các package cần thiết
+sudo apt install -y build-essential python3
+sudo apt install -y sqlite3
+
+# Cài đặt PM2 startup script
+pm2 startup
+# Chạy lệnh được output từ lệnh trên
+\end{lstlisting}
+
+\section{Clone Source Code}
+
+\subsection{Tạo thư mục dự án}
+\begin{lstlisting}[language=bash]
+# Tạo thư mục dự án
+sudo mkdir -p /var/www/cobalt-cms
+sudo chown ubuntu:ubuntu /var/www/cobalt-cms
+cd /var/www/cobalt-cms
+\end{lstlisting}
+
+\subsection{Clone từ Git repository}
+\begin{lstlisting}[language=bash]
+# Clone source code
+git clone https://git.technest.vn/JLAT/cms.git .
+
+# Kiểm tra branch và pull latest
+git checkout main
+git pull origin main
+\end{lstlisting}
+
+\section{Setup Source Code}
+
+\subsection{Cài đặt dependencies}
+\begin{lstlisting}[language=bash]
+# Cài đặt npm packages
+npm install
+
+# Kiểm tra cài đặt
+npm list --depth=0
+\end{lstlisting}
+
+\subsection{Cấu hình environment}
+\begin{lstlisting}[language=bash]
+# Copy file environment
+cp .env.example .env
+
+# Chỉnh sửa file .env
+nano .env
+\end{lstlisting}
+
+Cấu hình file \texttt{.env}:
+\begin{lstlisting}[language=plaintext]
+HOST=0.0.0.0
+PORT=1337
+APP_KEYS=your-app-keys-here
+API_TOKEN_SALT=your-api-token-salt
+ADMIN_JWT_SECRET=your-admin-jwt-secret
+JWT_SECRET=your-jwt-secret
+NODE_ENV=production
+DATABASE_CLIENT=sqlite
+DATABASE_FILENAME=.tmp/data.db
+\end{lstlisting}
+
+\subsection{Cấu hình Server (config/server.ts)}
+File \texttt{config/server.ts} cần được cấu hình cho production:
+\begin{lstlisting}[language=typescript]
+export default ({ env }) => ({
+  host: env('HOST', '0.0.0.0'),
+  port: env.int('PORT', 1337),
+  url: env('PUBLIC_URL', 'https://your-domain.com'),  // ← URL production
+  app: {
+    keys: env.array('APP_KEYS'),
+  },
+});
+\end{lstlisting}
+
+\subsection{Cấu hình Database (config/database.ts)}
+File \texttt{config/database.ts} đã được cấu hình sẵn, nhưng cần đảm bảo environment variables phù hợp:
+
+\subsubsection{Cho SQLite (Production)}
+\begin{lstlisting}[language=plaintext]
+DATABASE_CLIENT=sqlite
+DATABASE_FILENAME=.tmp/data.db
+\end{lstlisting}
+
+\subsubsection{Cho PostgreSQL (Production)}
+\begin{lstlisting}[language=plaintext]
+DATABASE_CLIENT=postgres
+DATABASE_HOST=your-db-host
+DATABASE_PORT=5432
+DATABASE_NAME=your_db_name
+DATABASE_USERNAME=your_db_user
+DATABASE_PASSWORD=your_db_password
+DATABASE_SSL=false
+DATABASE_SCHEMA=public
+\end{lstlisting}
+
+\subsubsection{Cho MySQL (Production)}
+\begin{lstlisting}[language=plaintext]
+DATABASE_CLIENT=mysql
+DATABASE_HOST=your-db-host
+DATABASE_PORT=3306
+DATABASE_NAME=your_db_name
+DATABASE_USERNAME=your_db_user
+DATABASE_PASSWORD=your_db_password
+DATABASE_SSL=false
+\end{lstlisting}
+
+\subsection{Cấu hình Admin (config/admin.ts)}
+File \texttt{config/admin.ts} cần các environment variables sau:
+\begin{lstlisting}[language=plaintext]
+ADMIN_JWT_SECRET=your-admin-jwt-secret
+API_TOKEN_SALT=your-api-token-salt
+TRANSFER_TOKEN_SALT=your-transfer-token-salt
+ENCRYPTION_KEY=your-encryption-key
+FLAG_NPS=false
+FLAG_PROMOTE_EE=false
+\end{lstlisting}
+
+\subsection{Tạo các keys cần thiết}
+\begin{lstlisting}[language=bash]
+# Tạo APP_KEYS (cần ít nhất 2 keys)
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Tạo JWT secrets
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Tạo API token salt
+node -e "console.log(require('crypto').randomBytes(16).toString('base64'))"
+
+# Tạo encryption key
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+\end{lstlisting}
+
+\subsection{File .env hoàn chỉnh cho Production}
+\begin{lstlisting}[language=plaintext]
+# Server Configuration
+HOST=0.0.0.0
+PORT=1337
+PUBLIC_URL=https://your-domain.com
+
+# App Keys (tạo ít nhất 2 keys)
+APP_KEYS=key1,key2
+
+# JWT Secrets
+ADMIN_JWT_SECRET=your-admin-jwt-secret-here
+JWT_SECRET=your-jwt-secret-here
+
+# API Token
+API_TOKEN_SALT=your-api-token-salt-here
+TRANSFER_TOKEN_SALT=your-transfer-token-salt-here
+
+# Encryption
+ENCRYPTION_KEY=your-encryption-key-here
+
+# Environment
+NODE_ENV=production
+
+# Database Configuration (SQLite)
+DATABASE_CLIENT=sqlite
+DATABASE_FILENAME=.tmp/data.db
+
+# Admin Flags
+FLAG_NPS=false
+FLAG_PROMOTE_EE=false
+\end{lstlisting}
+
+\section{Copy Database và Media Files}
+
+\subsection{Copy Database từ local}
+Sử dụng SCP để copy database từ máy local:
+\begin{lstlisting}[language=bash]
+# Copy database từ local (chạy trên máy local)
+scp -i your-key.pem database/data.db ubuntu@your-ec2-public-ip:/var/www/cobalt-cms/.tmp/
+
+# Hoặc copy toàn bộ thư mục database
+scp -i your-key.pem -r database/ ubuntu@your-ec2-public-ip:/var/www/cobalt-cms/
+\end{lstlisting}
+
+\subsection{Copy Media Files}
+\begin{lstlisting}[language=bash]
+# Copy thư mục uploads từ local (chạy trên máy local)
+scp -i your-key.pem -r public/uploads/ ubuntu@your-ec2-public-ip:/var/www/cobalt-cms/public/
+
+# Hoặc copy toàn bộ thư mục public
+scp -i your-key.pem -r public/ ubuntu@your-ec2-public-ip:/var/www/cobalt-cms/
+\end{lstlisting}
+
+\subsection{Set permissions}
+\begin{lstlisting}[language=bash]
+# Set quyền cho database và media files
+sudo chown -R ubuntu:ubuntu /var/www/cobalt-cms
+sudo chmod -R 755 /var/www/cobalt-cms
+sudo chmod 664 /var/www/cobalt-cms/.tmp/data.db
+\end{lstlisting}
+
+\section{Build và Deploy}
+
+\subsection{Build ứng dụng}
+\begin{lstlisting}[language=bash]
+# Build ứng dụng Strapi
+npm run build
+
+# Kiểm tra thư mục build
+ls -la dist/
+\end{lstlisting}
+
+\subsection{Start ứng dụng với PM2}
+\begin{lstlisting}[language=bash]
+# Start ứng dụng
+pm2 start npm --name "cobalt-cms" -- start
+
+# Kiểm tra trạng thái
+pm2 status
+pm2 logs cobalt-cms
+
+# Save PM2 configuration
+pm2 save
+\end{lstlisting}
+
+\section{Cấu hình Nginx}
+
+\subsection{Tạo Nginx configuration}
+\begin{lstlisting}[language=bash]
+sudo nano /etc/nginx/sites-available/cobalt-cms
+\end{lstlisting}
+
+Nội dung file configuration:
+\begin{lstlisting}[language=nginx]
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;
+
+    # Redirect HTTP to HTTPS (nếu có SSL)
+    # return 301 https://$server_name$request_uri;
+
+    location / {
+        proxy_pass http://localhost:1337;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Serve static files
+    location /uploads/ {
+        alias /var/www/cobalt-cms/public/uploads/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Admin panel
+    location /admin {
+        proxy_pass http://localhost:1337;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+\end{lstlisting}
+
+\subsection{Enable site và restart Nginx}
+\begin{lstlisting}[language=bash]
+# Enable site
+sudo ln -s /etc/nginx/sites-available/cobalt-cms /etc/nginx/sites-enabled/
+
+# Test configuration
+sudo nginx -t
+
+# Restart Nginx
+sudo systemctl restart nginx
+\end{lstlisting}
+
+\section{Test và Kiểm tra}
+
+\subsection{Kiểm tra ứng dụng}
+\begin{lstlisting}[language=bash]
+# Kiểm tra PM2 processes
+pm2 status
+pm2 logs cobalt-cms
+
+# Kiểm tra port 1337
+sudo netstat -tlnp | grep :1337
+
+# Kiểm tra Nginx
+sudo systemctl status nginx
+\end{lstlisting}
+
+\subsection{Test từ browser}
+\begin{itemize}
+    \item \textbf{Main site}: \texttt{http://your-ec2-public-ip}
+    \item \textbf{Admin panel}: \texttt{http://your-ec2-public-ip/admin}
+    \item \textbf{API}: \texttt{http://your-ec2-public-ip/api}
+\end{itemize}
+
+\subsection{Test API endpoints}
+\begin{lstlisting}[language=bash]
+# Test API health
+curl http://localhost:1337/api/health
+
+# Test từ external
+curl http://your-ec2-public-ip/api/health
+\end{lstlisting}
+
+\section{Monitoring và Maintenance}
+
+\subsection{PM2 Monitoring}
+\begin{lstlisting}[language=bash]
+# Xem logs real-time
+pm2 logs cobalt-cms --lines 100
+
+# Restart ứng dụng
+pm2 restart cobalt-cms
+
+# Reload ứng dụng
+pm2 reload cobalt-cms
+
+# Stop ứng dụng
+pm2 stop cobalt-cms
+\end{lstlisting}
+
+\subsection{System Monitoring}
+\begin{lstlisting}[language=bash]
+# Kiểm tra disk usage
+df -h
+
+# Kiểm tra memory usage
+free -h
+
+# Kiểm tra CPU usage
+htop
+
+# Kiểm tra Nginx access logs
+sudo tail -f /var/log/nginx/access.log
+\end{lstlisting}
+
+\section{Troubleshooting}
+
+\subsection{Các vấn đề thường gặp}
+
+\subsubsection{Port 1337 không accessible}
+\begin{lstlisting}[language=bash]
+# Kiểm tra firewall
+sudo ufw status
+
+# Mở port nếu cần
+sudo ufw allow 1337
+\end{lstlisting}
+
+\subsubsection{Database connection error}
+\begin{lstlisting}[language=bash]
+# Kiểm tra file database
+ls -la .tmp/data.db
+
+# Kiểm tra permissions
+sudo chown ubuntu:ubuntu .tmp/data.db
+sudo chmod 664 .tmp/data.db
+\end{lstlisting}
+
+\subsubsection{Nginx 502 Bad Gateway}
+\begin{lstlisting}[language=bash]
+# Kiểm tra ứng dụng có chạy không
+pm2 status
+
+# Kiểm tra logs
+pm2 logs cobalt-cms
+
+# Restart ứng dụng
+pm2 restart cobalt-cms
+\end{lstlisting}
+
+\section{Backup và Recovery}
+
+\subsection{Backup Database}
+\begin{lstlisting}[language=bash]
+# Tạo backup database
+cp .tmp/data.db .tmp/data.db.backup.$(date +%Y%m%d_%H%M%S)
+
+# Backup toàn bộ thư mục
+tar -czf cobalt-cms-backup-$(date +%Y%m%d_%H%M%S).tar.gz \
+    .tmp/ public/uploads/ config/ src/
+\end{lstlisting}
+
+\subsection{Recovery từ backup}
+\begin{lstlisting}[language=bash]
+# Restore database
+cp .tmp/data.db.backup.20241201_143000 .tmp/data.db
+
+# Restore từ archive
+tar -xzf cobalt-cms-backup-20241201_143000.tar.gz
+\end{lstlisting}
+
+\section{Kết luận}
+
+Quy trình setup EC2 cho Cobalt CMS đã hoàn thành với các bước chính:
+\begin{enumerate}
+    \item Tạo và cấu hình EC2 instance
+    \item Cài đặt các dịch vụ cần thiết
+    \item Clone và setup source code
+    \item Copy database và media files
+    \item Build và deploy ứng dụng
+    \item Cấu hình Nginx reverse proxy
+    \item Test và monitoring
+\end{enumerate}
+
+\subsection{Lưu ý quan trọng}
+\begin{itemize}
+    \item Luôn backup database trước khi deploy
+    \item Kiểm tra permissions cho các file và thư mục
+    \item Monitor logs để phát hiện vấn đề sớm
+    \item Cập nhật security groups và firewall rules
+    \item Sử dụng PM2 để quản lý process hiệu quả
+\end{itemize}
+
+\subsection{Liên hệ hỗ trợ}
+Nếu gặp vấn đề trong quá trình setup, vui lòng liên hệ:
+\begin{itemize}
+    \item \textbf{Email}: dev@technest.vn
+    \item \textbf{Slack}: \#cobalt-cms-support
+    \item \textbf{Documentation}: \url{https://docs.technest.vn/cobalt-cms}
+\end{itemize}
+
+\end{document}

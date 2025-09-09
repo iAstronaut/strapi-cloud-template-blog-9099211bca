@@ -1,0 +1,40 @@
+{
+  "kind": "collectionType",
+  "collectionName": "cobalt_manuals",
+  "info": {
+    "singularName": "cobalt-manual",
+    "pluralName": "cobalt-manuals",
+    "displayName": "COBALT-MANUAL"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "string"
+    },
+    "fileName": {
+      "type": "string"
+    },
+    "lastUpdate": {
+      "type": "datetime"
+    },
+    "fileSize": {
+      "type": "decimal"
+    },
+    "slug": {
+      "type": "uid"
+    },
+    "pdf": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    }
+  }
+}
